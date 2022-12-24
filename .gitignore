@@ -1,0 +1,4 @@
+.idea
+web
+cmd/client/public/*.gz
+cmd/client/public/assets/*.gz
