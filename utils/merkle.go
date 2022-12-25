@@ -2,7 +2,6 @@ package utils
 
 import (
 	"crypto/sha256"
-	"log"
 )
 
 type MerkleTree struct {
@@ -42,7 +41,7 @@ func NewMerkleTree(data [][]byte) *MerkleTree {
 	}
 
 	if len(nodes) == 0 {
-		log.Panic("No merkel nodes")
+		return nil
 	}
 
 	for len(nodes) > 1 {

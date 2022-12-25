@@ -19,7 +19,6 @@ type Header struct {
 	PreviousHash   [32]byte
 	MerkleRootHash []byte
 	Timestamp      int64
-	Target         []byte
 	Nonce          uint64
 }
 
@@ -28,30 +27,29 @@ func (h *Header) MarshalJSON() ([]byte, error) {
 		PreviousHash   string `json:"previous_hash"`
 		MerkleRootHash []byte `json:"merkle_root_hash"`
 		Timestamp      int64  `json:"timestamp"`
-		Target         []byte `json:"target"`
 		Nonce          uint64 `json:"nonce"`
 	}{
 		PreviousHash:   fmt.Sprintf("%x", h.PreviousHash),
 		MerkleRootHash: h.MerkleRootHash,
 		Timestamp:      h.Timestamp,
-		Target:         h.Target,
 		Nonce:          h.Nonce,
 	})
 }
 
-func NewBlock(nonce uint64, previousHash [32]byte, transactions []*transaction.Transaction) *Block {
+func New(nonce uint64, previousHash [32]byte, transactions []*transaction.Transaction) *Block {
 	return &Block{
 		Header: Header{
-			Nonce:        nonce,
-			PreviousHash: previousHash,
-			Timestamp:    time.Now().UnixNano(),
+			Nonce:          nonce,
+			PreviousHash:   previousHash,
+			Timestamp:      time.Now().UnixNano(),
+			MerkleRootHash: merkleRootHash(transactions),
 		},
 		Transactions: transactions,
 	}
 }
 
 func NewGenesisBlock(transactions []*transaction.Transaction) *Block {
-	return NewBlock(0, [32]byte{}, transactions)
+	return New(0, [32]byte{}, transactions)
 }
 
 func (b *Block) Print() {
@@ -81,10 +79,10 @@ func (b *Block) Hash() [32]byte {
 	return sha256.Sum256(m)
 }
 
-func (b *Block) merkleRootHash() []byte {
+func merkleRootHash(transactions []*transaction.Transaction) []byte {
 	var txHashes [][]byte
 
-	for _, tx := range b.Transactions {
+	for _, tx := range transactions {
 		tm, err := tx.MarshalJSON()
 		if err != nil {
 			log.Fatal(err)
@@ -92,6 +90,8 @@ func (b *Block) merkleRootHash() []byte {
 		txHashes = append(txHashes, tm)
 	}
 	tree := utils.NewMerkleTree(txHashes)
-
+	if tree == nil {
+		return []byte{}
+	}
 	return tree.RootNode.Data
 }

@@ -7,43 +7,45 @@ import (
 	"fmt"
 	"github.com/fr13n8/go-blockchain/block"
 	"github.com/fr13n8/go-blockchain/transaction"
+	"github.com/fr13n8/go-blockchain/trxpool"
 	"github.com/fr13n8/go-blockchain/utils"
 	"log"
 	"strings"
 	"sync"
-	"time"
 )
 
 const (
-	MINING_DIFFICULTY = 3
-	MINING_SENDER     = "THE BLOCKCHAIN"
-	MINING_REWARD     = 1.0
-	MINING_TIMER      = 20
+	MINING_SENDER = "THE BLOCKCHAIN"
 )
 
 type BlockChain struct {
-	transactionPool   []*transaction.Transaction
+	TransactionPool   *trxpool.TransactionPool
 	chain             []*block.Block
-	blockChainAddress string
+	BlockChainAddress string
 	port              uint16
 	mux               sync.Mutex
 }
 
 func NewBlockChain(blockChainAddress string, port uint16) *BlockChain {
 	b := block.NewGenesisBlock([]*transaction.Transaction{})
+	trxPoll := trxpool.NewTransactionPool()
 	bc := &BlockChain{
-		transactionPool:   []*transaction.Transaction{},
+		TransactionPool:   trxPoll,
 		chain:             []*block.Block{},
-		blockChainAddress: blockChainAddress,
+		BlockChainAddress: blockChainAddress,
 		port:              port,
 	}
 
-	bc.CreateBlock(0, b.Hash())
+	bc.CreateBlock(b)
 	return bc
 }
 
-func (bc *BlockChain) GetTransactionsPool() []*transaction.Transaction {
-	return bc.transactionPool
+func (bc *BlockChain) ReadTransactionsPool() []*transaction.Transaction {
+	return bc.TransactionPool.Read(10)
+}
+
+func (bc *BlockChain) GetTransactionPool() []*transaction.Transaction {
+	return bc.TransactionPool.GetAndClean(10)
 }
 
 func (bc *BlockChain) MarshalJSON() ([]byte, error) {
@@ -54,10 +56,8 @@ func (bc *BlockChain) MarshalJSON() ([]byte, error) {
 	})
 }
 
-func (bc *BlockChain) CreateBlock(nonce uint64, previousHash [32]byte) *block.Block {
-	b := block.NewBlock(nonce, previousHash, bc.transactionPool)
+func (bc *BlockChain) CreateBlock(b *block.Block) *block.Block {
 	bc.chain = append(bc.chain, b)
-	bc.transactionPool = []*transaction.Transaction{}
 	return b
 }
 
@@ -83,7 +83,7 @@ func (bc *BlockChain) AddTransaction(senderAddress, recipientAddress string, val
 	t := transaction.NewTransaction(senderAddress, recipientAddress, value)
 
 	if senderAddress == MINING_SENDER {
-		bc.transactionPool = append(bc.transactionPool, t)
+		bc.TransactionPool.Add(t)
 		return true
 	}
 
@@ -92,7 +92,7 @@ func (bc *BlockChain) AddTransaction(senderAddress, recipientAddress string, val
 		//	log.Printf("ERROR: Not enough balance in wallet")
 		//	return false
 		//}
-		bc.transactionPool = append(bc.transactionPool, t)
+		bc.TransactionPool.Add(t)
 		return true
 	}
 	log.Printf("ERROR: Invalid transaction from %s\n", senderAddress)
@@ -108,58 +108,13 @@ func (bc *BlockChain) VerifyTransactionSignature(senderPublicKey *ecdsa.PublicKe
 	return ecdsa.Verify(senderPublicKey, h[:], s.R, s.S)
 }
 
-func (bc *BlockChain) CopyTransactionPool() []*transaction.Transaction {
-	var transactions []*transaction.Transaction
-	for _, t := range bc.transactionPool {
-		transactions = append(transactions, transaction.NewTransaction(t.SenderAddress, t.RecipientAddress, t.Amount))
-	}
-	return transactions
-}
-
-func (bc *BlockChain) IsValid(nonce uint64, previousHash [32]byte, transactions []*transaction.Transaction, difficulty int) bool {
-	zeros := strings.Repeat("0", difficulty)
-	guessBlock := block.Block{
-		Header: block.Header{
-			Nonce:        nonce,
-			PreviousHash: previousHash,
-			Timestamp:    0,
-		},
-		Transactions: transactions,
-	}
-	guessHashStr := fmt.Sprintf("%x", guessBlock.Hash())
-	return guessHashStr[:difficulty] == zeros
-}
-
-func (bc *BlockChain) ProofOfWork() uint64 {
-	transactions := bc.CopyTransactionPool()
-	previousHash := bc.LastBlock().Hash()
-	nonce := uint64(0)
-	for !bc.IsValid(nonce, previousHash, transactions, MINING_DIFFICULTY) {
-		nonce++
-	}
-	return nonce
-}
-
-func (bc *BlockChain) Mine() bool {
-	bc.mux.Lock()
-	defer bc.mux.Unlock()
-
-	if len(bc.transactionPool) == 0 {
-		return false
-	}
-
-	bc.AddTransaction(MINING_SENDER, bc.blockChainAddress, MINING_REWARD, nil, nil)
-	nonce := bc.ProofOfWork()
-	previousHash := bc.LastBlock().Hash()
-	bc.CreateBlock(nonce, previousHash)
-
-	return true
-}
-
-func (bc *BlockChain) StartMining() {
-	bc.Mine()
-	time.AfterFunc(time.Second*MINING_TIMER, bc.StartMining)
-}
+//func (bc *BlockChain) CopyTransactionPool() []*transaction.Transaction {
+//	var transactions []*transaction.Transaction
+//	for _, t := range bc.TransactionPool {
+//		transactions = append(transactions, transaction.NewTransaction(t.SenderAddress, t.RecipientAddress, t.Amount))
+//	}
+//	return transactions
+//}
 
 func (bc *BlockChain) Balance(blockChainAddress string) float32 {
 	var balance float32

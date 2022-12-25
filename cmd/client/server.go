@@ -55,14 +55,14 @@ func (s *Server) Run() <-chan os.Signal {
 
 	s.app.Use(cors.New())
 
-	s.app.Static("/", "cmd/client/public", fiber.Static{
+	cfg := fiber.Static{
 		Compress:      true,
 		ByteRange:     true,
 		Browse:        true,
 		Index:         "index.html",
 		CacheDuration: 10 * time.Second,
 		MaxAge:        3600,
-	})
+	}
 
 	s.app.Static("/assets", "cmd/client/public", fiber.Static{
 		Compress:      true,
@@ -74,6 +74,9 @@ func (s *Server) Run() <-chan os.Signal {
 	s.app.Post("/wallet/create", s.WalletCreate)
 	s.app.Post("/transaction/create", s.CreateTransaction)
 	s.app.Get("/wallet/balance/:address", s.GetBalance)
+
+	s.app.Static("/", "cmd/client/public", cfg)
+	s.app.Static("/*", "cmd/client/public", cfg)
 
 	go func() {
 		if err := s.app.Listen(fmt.Sprintf("%s:%s", s.host, fmt.Sprintf("%d", s.port))); err != nil {

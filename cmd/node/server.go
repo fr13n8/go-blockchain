@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/fr13n8/go-blockchain/block"
 	"github.com/fr13n8/go-blockchain/blockchain"
+	"github.com/fr13n8/go-blockchain/miner"
 	"github.com/fr13n8/go-blockchain/transaction"
 	"github.com/fr13n8/go-blockchain/utils"
 	"github.com/fr13n8/go-blockchain/wallet"
@@ -135,7 +137,7 @@ func (s *Server) CreateTransaction(ctx *fiber.Ctx) error {
 
 func (s *Server) GetTransactions(ctx *fiber.Ctx) error {
 	bc := s.getBlockChain()
-	transactions := bc.GetTransactionsPool()
+	transactions := bc.ReadTransactionsPool()
 	m, err := json.Marshal(struct {
 		Transactions []*transaction.Transaction `json:"transactions"`
 		Length       int                        `json:"length"`
@@ -154,7 +156,10 @@ func (s *Server) GetTransactions(ctx *fiber.Ctx) error {
 
 func (s *Server) Mine(ctx *fiber.Ctx) error {
 	bc := s.getBlockChain()
-	isMined := bc.Mine()
+
+	solver := block.NewSHA256Solver()
+	m := miner.NewMiner(bc.BlockChainAddress, solver, bc)
+	isMined := m.Mine()
 	if !isMined {
 		return ctx.Status(http.StatusInternalServerError).SendString("Error while mining")
 	}
@@ -164,7 +169,10 @@ func (s *Server) Mine(ctx *fiber.Ctx) error {
 
 func (s *Server) StartMining(ctx *fiber.Ctx) error {
 	bc := s.getBlockChain()
-	bc.StartMining()
+
+	solver := block.NewSHA256Solver()
+	m := miner.NewMiner(bc.BlockChainAddress, solver, bc)
+	m.StartMining()
 
 	return ctx.Status(http.StatusOK).SendString("Mining started")
 }
