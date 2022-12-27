@@ -34,6 +34,8 @@ func (s *SHA256Solver) Solve(b *Block) bool {
 		hashInt := utils.HashToBig(&hash)
 
 		if hashInt.Cmp(s.difficulty) <= 0 {
+			b.Header.Target = s.difficulty.Bytes()
+			b.Header.Hash = hash
 			return true
 		}
 	}

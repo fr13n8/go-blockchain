@@ -1,17 +1,20 @@
 package blockchain
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
+	"strings"
+	"sync"
+
 	"github.com/fr13n8/go-blockchain/block"
 	"github.com/fr13n8/go-blockchain/transaction"
 	"github.com/fr13n8/go-blockchain/trxpool"
 	"github.com/fr13n8/go-blockchain/utils"
-	"log"
-	"strings"
-	"sync"
 )
 
 const (
@@ -40,12 +43,47 @@ func NewBlockChain(blockChainAddress string, port uint16) *BlockChain {
 	return bc
 }
 
+func (bc *BlockChain) GetBlocks() []*block.Block {
+	return bc.chain
+}
+
 func (bc *BlockChain) ReadTransactionsPool() []*transaction.Transaction {
 	return bc.TransactionPool.Read(10)
 }
 
 func (bc *BlockChain) GetTransactionPool() []*transaction.Transaction {
 	return bc.TransactionPool.GetAndClean(10)
+}
+
+func (bc *BlockChain) GetBlockByHash(hash string) (*block.Block, error) {
+	blockHashBytes, err := hex.DecodeString(hash)
+	if err != nil {
+		log.Printf("ERROR: %s\n", err)
+		return nil, err
+	}
+
+	for _, b := range bc.chain {
+		blockHash := b.Hash()
+		if bytes.Equal(blockHash[:], blockHashBytes) {
+			return b, nil
+		}
+	}
+	return nil, fmt.Errorf("block with hash %s not found", hash)
+}
+
+func (bc *BlockChain) GetTransactionByHash(hash string) (*transaction.Transaction, error) {
+	var tx *transaction.Transaction
+	for _, b := range bc.chain {
+		for _, t := range b.Transactions {
+			if t.HexHash() == hash {
+				tx = t
+			}
+		}
+	}
+	if tx == nil {
+		return nil, fmt.Errorf("transaction with hash %s not found", hash)
+	}
+	return tx, nil
 }
 
 func (bc *BlockChain) MarshalJSON() ([]byte, error) {
@@ -74,8 +112,9 @@ func (bc *BlockChain) Print() {
 }
 
 func (bc *BlockChain) CreateTransaction(senderAddress, recipientAddress string, value float32, senderPublicKey *ecdsa.PublicKey, s *utils.Signature) bool {
+	bc.mux.Lock()
+	defer bc.mux.Unlock()
 	isTransactionAdded := bc.AddTransaction(senderAddress, recipientAddress, value, senderPublicKey, s)
-	// TODO: add mutex
 	return isTransactionAdded
 }
 
@@ -104,7 +143,8 @@ func (bc *BlockChain) VerifyTransactionSignature(senderPublicKey *ecdsa.PublicKe
 	if err != nil {
 		panic(err)
 	}
-	h := sha256.Sum256(m)
+	first := sha256.Sum256(m)
+	h := sha256.Sum256(first[:])
 	return ecdsa.Verify(senderPublicKey, h[:], s.R, s.S)
 }
 

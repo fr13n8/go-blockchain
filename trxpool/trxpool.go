@@ -2,8 +2,9 @@ package trxpool
 
 import (
 	"fmt"
-	"github.com/fr13n8/go-blockchain/transaction"
 	"sync"
+
+	"github.com/fr13n8/go-blockchain/transaction"
 )
 
 type TransactionPool struct {
@@ -19,17 +20,22 @@ func NewTransactionPool() *TransactionPool {
 
 func (tp *TransactionPool) Add(tx *transaction.Transaction) {
 	tp.l.Lock()
-	h, err := tx.Hash()
+	Id, err := tx.Hash()
 	if err != nil {
 		return
 	}
-	tp.pool[fmt.Sprintf("%x", h)] = tx
+	tx.Id = Id
+	hash, err := tx.Hash()
+	if err != nil {
+		return
+	}
+	tp.pool[fmt.Sprintf("%x", hash)] = tx
 	tp.l.Unlock()
 }
 
 func (tp *TransactionPool) Clean(trxs []*transaction.Transaction) {
-	for _, tx := range trxs {
-		h, err := tx.Hash()
+	for _, t := range trxs {
+		h, err := t.Hash()
 		if err != nil {
 			continue
 		}

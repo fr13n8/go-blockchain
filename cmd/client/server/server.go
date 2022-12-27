@@ -1,33 +1,35 @@
-package main
+package server
 
 import (
 	"bytes"
+	"context"
+	"embed"
 	"encoding/json"
 	"fmt"
+	"io/fs"
+	"log"
+	"net/http"
+	"strconv"
+	"time"
+
+	"github.com/gofiber/fiber/v2/middleware/filesystem"
+
 	"github.com/fr13n8/go-blockchain/blockchain"
 	"github.com/fr13n8/go-blockchain/transaction"
 	"github.com/fr13n8/go-blockchain/utils"
 	"github.com/fr13n8/go-blockchain/wallet"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
-	"net/http"
-	"strconv"
 )
 
-import (
-	"context"
-	"log"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
-)
+//go:embed public
+var frontend embed.FS
 
-type ServerConfig struct {
-	port       uint16
-	gateway    string
-	host       string
-	serverName string
+type Config struct {
+	Port       uint16
+	Gateway    string
+	Host       string
+	ServerName string
 }
 
 type Server struct {
@@ -37,54 +39,42 @@ type Server struct {
 	port    uint16
 }
 
-func NewServer(cfg *ServerConfig) *Server {
+func NewServer(cfg *Config) *Server {
+	fmt.Println("Gateway: ", cfg.Gateway)
 	return &Server{
 		app: fiber.New(
 			fiber.Config{
-				AppName: cfg.serverName,
+				AppName: cfg.ServerName,
 			}),
-		gateway: cfg.gateway,
-		port:    cfg.port,
-		host:    cfg.host,
+		gateway: cfg.Gateway,
+		port:    cfg.Port,
+		host:    cfg.Host,
 	}
 }
 
-func (s *Server) Run() <-chan os.Signal {
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)
+func (s *Server) Run() {
+	stripped, err := fs.Sub(frontend, "public")
+	if err != nil {
+		log.Fatalln(err)
+	}
 
 	s.app.Use(cors.New())
 
-	cfg := fiber.Static{
-		Compress:      true,
-		ByteRange:     true,
-		Browse:        true,
-		Index:         "index.html",
-		CacheDuration: 10 * time.Second,
-		MaxAge:        3600,
-	}
+	api := s.app.Group("/api")
+	api.Post("/wallet/create", s.WalletCreate)
+	api.Post("/transaction/create", s.CreateTransaction)
+	api.Get("/wallet/balance/:address", s.GetBalance)
 
-	s.app.Static("/assets", "cmd/client/public", fiber.Static{
-		Compress:      true,
-		ByteRange:     true,
-		Browse:        true,
-		CacheDuration: 10 * time.Second,
-		MaxAge:        3600,
-	})
-	s.app.Post("/wallet/create", s.WalletCreate)
-	s.app.Post("/transaction/create", s.CreateTransaction)
-	s.app.Get("/wallet/balance/:address", s.GetBalance)
-
-	s.app.Static("/", "cmd/client/public", cfg)
-	s.app.Static("/*", "cmd/client/public", cfg)
-
+	s.app.Use("/", filesystem.New(filesystem.Config{
+		Root:   http.FS(stripped),
+		Index:  "index.html",
+		Browse: true,
+	}))
 	go func() {
 		if err := s.app.Listen(fmt.Sprintf("%s:%s", s.host, fmt.Sprintf("%d", s.port))); err != nil {
 			log.Fatalf("Error while running server: %s", err.Error())
 		}
 	}()
-
-	return quit
 }
 
 func (s *Server) ShutdownGracefully() {
@@ -105,7 +95,7 @@ func (s *Server) ShutdownGracefully() {
 		if err != nil {
 			log.Fatal("Error while shutting down server", err)
 		} else {
-			fmt.Println("Server Shutdown Successful")
+			log.Printf("[WALLET] Server gracefully stopped")
 		}
 	}
 }
@@ -204,7 +194,7 @@ func (s *Server) CreateTransaction(ctx *fiber.Ctx) error {
 	}
 	buf := bytes.NewBuffer(m)
 
-	resp, err := http.Post(fmt.Sprintf("%s/transactions", s.gateway), "application/json", buf)
+	resp, err := http.Post(fmt.Sprintf("%s/api/transactions", s.gateway), "application/json", buf)
 	if err != nil {
 		return err
 	}
@@ -224,7 +214,7 @@ func (s *Server) CreateTransaction(ctx *fiber.Ctx) error {
 
 func (s *Server) GetBalance(ctx *fiber.Ctx) error {
 	address := ctx.Params("address")
-	resp, err := http.Get(fmt.Sprintf("%s/balance/%s", s.gateway, address))
+	resp, err := http.Get(fmt.Sprintf("%s/api/balance/%s", s.gateway, address))
 	if err != nil {
 		return err
 	}

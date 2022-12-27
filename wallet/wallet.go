@@ -96,11 +96,3 @@ func (w *Wallet) MarshalJSON() ([]byte, error) {
 	}
 	return m, nil
 }
-
-type Transaction struct {
-	senderPrivateKey *ecdsa.PrivateKey
-	senderPublicKey  *ecdsa.PublicKey
-	senderAddress    string
-	recipientAddress string
-	amount           float32
-}

@@ -1,9 +1,15 @@
-package main
+package server
 
 import (
 	"context"
+	"embed"
 	"encoding/json"
 	"fmt"
+	"io/fs"
+	"log"
+	"net/http"
+	"time"
+
 	"github.com/fr13n8/go-blockchain/block"
 	"github.com/fr13n8/go-blockchain/blockchain"
 	"github.com/fr13n8/go-blockchain/miner"
@@ -11,20 +17,19 @@ import (
 	"github.com/fr13n8/go-blockchain/utils"
 	"github.com/fr13n8/go-blockchain/wallet"
 	"github.com/gofiber/fiber/v2"
-	"log"
-	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
+	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v2/middleware/filesystem"
 )
+
+//go:embed public
+var frontend embed.FS
 
 var cache = make(map[string]*blockchain.BlockChain)
 
-type ServerConfig struct {
-	port       uint16
-	host       string
-	serverName string
+type Config struct {
+	Port       uint16
+	Host       string
+	ServerName string
 }
 
 type Server struct {
@@ -37,35 +42,48 @@ func (s *Server) Port() uint16 {
 	return s.port
 }
 
-func NewServer(cfg *ServerConfig) *Server {
+func NewServer(cfg *Config) *Server {
 	return &Server{
 		app: fiber.New(
 			fiber.Config{
-				AppName: cfg.serverName,
+				AppName: cfg.ServerName,
 			}),
-		port: cfg.port,
-		host: cfg.host,
+		port: cfg.Port,
+		host: cfg.Host,
 	}
 }
 
-func (s *Server) Run() <-chan os.Signal {
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)
+func (s *Server) Run() {
+	stripped, err := fs.Sub(frontend, "public")
+	if err != nil {
+		log.Fatalln(err)
+	}
 
-	s.app.Get("/chain", s.GetChain)
-	s.app.Post("/transactions", s.CreateTransaction)
-	s.app.Get("/transactions", s.GetTransactions)
-	s.app.Get("/mine", s.Mine)
-	s.app.Get("/mine/start", s.StartMining)
-	s.app.Get("/balance/:address", s.GetBalance)
+	s.app.Use(cors.New())
+
+	api := s.app.Group("/api")
+	api.Get("/chain", s.GetChain)
+	api.Get("/blocks/all", s.GetBLocks)
+	api.Post("/transactions", s.CreateTransaction)
+	api.Get("/transactions", s.GetTransactions)
+	api.Get("/mine", s.Mine)
+	api.Get("/mine/start", s.StartMining)
+	api.Get("/mine/stop", s.StopMining)
+	api.Get("/balance/:address", s.GetBalance)
+	api.Get("/blocks/:hash", s.GetBlockByHash)
+	api.Get("/transactions/:hash", s.GetTransactionByHash)
+
+	s.app.Use("/", filesystem.New(filesystem.Config{
+		Root:   http.FS(stripped),
+		Index:  "index.html",
+		Browse: true,
+	}))
 
 	go func() {
 		if err := s.app.Listen(fmt.Sprintf("%s:%s", s.host, fmt.Sprintf("%d", s.port))); err != nil {
 			log.Fatalf("Error while running server: %s", err.Error())
 		}
 	}()
-
-	return quit
 }
 
 func (s *Server) ShutdownGracefully() {
@@ -86,7 +104,7 @@ func (s *Server) ShutdownGracefully() {
 		if err != nil {
 			log.Fatal("Error while shutting down server", err)
 		} else {
-			fmt.Println("Server Shutdown Successful")
+			log.Printf("[NODE] Server gracefully stopped")
 		}
 	}
 }
@@ -100,6 +118,51 @@ func (s *Server) getBlockChain() *blockchain.BlockChain {
 	}
 
 	return bc
+}
+
+func (s *Server) GetTransactionByHash(c *fiber.Ctx) error {
+	bc := s.getBlockChain()
+	hash := c.Params("hash")
+	tx, err := bc.GetTransactionByHash(hash)
+	if err != nil {
+		return c.Status(http.StatusNotFound).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.JSON(tx)
+}
+
+func (s *Server) GetBlockByHash(c *fiber.Ctx) error {
+	bc := s.getBlockChain()
+	hash := c.Params("hash")
+	block, err := bc.GetBlockByHash(hash)
+	if err != nil {
+		return c.Status(http.StatusNotFound).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.JSON(block)
+}
+
+func (s *Server) GetBLocks(ctx *fiber.Ctx) error {
+	bc := s.getBlockChain()
+	blocks := make([]string, 0, len(bc.GetBlocks()))
+	for _, b := range bc.GetBlocks() {
+		blocks = append(blocks, b.HexHash())
+	}
+
+	m, err := json.Marshal(struct {
+		Blocks []string `json:"blocks"`
+	}{
+		Blocks: blocks,
+	})
+	if err != nil {
+		return err
+	}
+
+	return ctx.SendString(string(m[:]))
 }
 
 func (s *Server) GetChain(ctx *fiber.Ctx) error {
@@ -117,7 +180,6 @@ func (s *Server) CreateTransaction(ctx *fiber.Ctx) error {
 	if err := ctx.BodyParser(&tReq); err != nil {
 		return err
 	}
-
 	if !tReq.Validate() {
 		return ctx.Status(fiber.StatusBadRequest).SendString("Invalid transaction request")
 	}
@@ -147,8 +209,7 @@ func (s *Server) GetTransactions(ctx *fiber.Ctx) error {
 	})
 
 	if err != nil {
-		panic(err)
-		ctx.Status(http.StatusInternalServerError).SendString("Error while getting transactions")
+		return ctx.Status(http.StatusInternalServerError).SendString("Error while getting transactions")
 	}
 
 	return ctx.SendString(string(m[:]))
@@ -174,7 +235,17 @@ func (s *Server) StartMining(ctx *fiber.Ctx) error {
 	m := miner.NewMiner(bc.BlockChainAddress, solver, bc)
 	m.StartMining()
 
-	return ctx.Status(http.StatusOK).SendString("Mining started")
+	return ctx.Status(http.StatusOK).SendString("")
+}
+
+func (s *Server) StopMining(ctx *fiber.Ctx) error {
+	bc := s.getBlockChain()
+
+	solver := block.NewSHA256Solver()
+	m := miner.NewMiner(bc.BlockChainAddress, solver, bc)
+	m.StopMining()
+
+	return ctx.Status(http.StatusOK).SendString("Mining stopped")
 }
 
 func (s *Server) GetBalance(ctx *fiber.Ctx) error {

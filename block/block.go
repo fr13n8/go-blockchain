@@ -20,6 +20,8 @@ type Header struct {
 	MerkleRootHash []byte
 	Timestamp      int64
 	Nonce          uint64
+	Target         []byte
+	Hash           [32]byte
 }
 
 func (h *Header) MarshalJSON() ([]byte, error) {
@@ -28,11 +30,13 @@ func (h *Header) MarshalJSON() ([]byte, error) {
 		MerkleRootHash []byte `json:"merkle_root_hash"`
 		Timestamp      int64  `json:"timestamp"`
 		Nonce          uint64 `json:"nonce"`
+		Target         string `json:"target"`
 	}{
 		PreviousHash:   fmt.Sprintf("%x", h.PreviousHash),
 		MerkleRootHash: h.MerkleRootHash,
 		Timestamp:      h.Timestamp,
 		Nonce:          h.Nonce,
+		Target:         fmt.Sprintf("%x", h.Target),
 	})
 }
 
@@ -77,6 +81,14 @@ func (b *Block) Hash() [32]byte {
 		log.Fatal(err)
 	}
 	return sha256.Sum256(m)
+}
+
+func (b *Block) HexHash() string {
+	return fmt.Sprintf("%x", b.Hash())
+}
+
+func (b *Block) HexHashPrevBlock() string {
+	return fmt.Sprintf("%x", b.Header.PreviousHash)
 }
 
 func merkleRootHash(transactions []*transaction.Transaction) []byte {

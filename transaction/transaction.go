@@ -8,6 +8,7 @@ import (
 )
 
 type Transaction struct {
+	Id               [32]byte
 	SenderAddress    string
 	RecipientAddress string
 	Amount           float32
@@ -26,14 +27,20 @@ func (t *Transaction) Print() {
 
 func (t *Transaction) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
+		Id               string  `json:"id"`
 		SenderAddress    string  `json:"sender_address"`
 		RecipientAddress string  `json:"recipient_address"`
 		Amount           float32 `json:"amount"`
 	}{
+		Id:               t.HexHash(),
 		SenderAddress:    t.SenderAddress,
 		RecipientAddress: t.RecipientAddress,
 		Amount:           t.Amount,
 	})
+}
+
+func (t *Transaction) HexHash() string {
+	return fmt.Sprintf("%x", t.Id)
 }
 
 func (t *Transaction) Hash() ([32]byte, error) {
