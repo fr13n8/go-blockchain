@@ -4,7 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"github.com/fr13n8/go-blockchain/transaction"
+	"github.com/fr13n8/go-blockchain/pkg/services/transaction"
 	"github.com/fr13n8/go-blockchain/utils"
 	"log"
 	"time"

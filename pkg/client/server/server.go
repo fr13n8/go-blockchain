@@ -1,23 +1,25 @@
 package server
 
 import (
-	"bytes"
 	"context"
 	"embed"
-	"encoding/json"
 	"fmt"
+	pb "github.com/fr13n8/go-blockchain/pkg/network/node"
+	"github.com/fr13n8/go-blockchain/pkg/services/wallet"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"io/fs"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
 	"strconv"
+	"syscall"
 	"time"
 
 	"github.com/gofiber/fiber/v2/middleware/filesystem"
 
-	"github.com/fr13n8/go-blockchain/blockchain"
-	"github.com/fr13n8/go-blockchain/transaction"
 	"github.com/fr13n8/go-blockchain/utils"
-	"github.com/fr13n8/go-blockchain/wallet"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 )
@@ -36,23 +38,40 @@ type Server struct {
 	app     *fiber.App
 	host    string
 	gateway string
+	nc      pb.NodeServiceClient
 	port    uint16
 }
 
 func NewServer(cfg *Config) *Server {
-	fmt.Println("Gateway: ", cfg.Gateway)
+	conn, err := grpc.Dial(cfg.Gateway, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatalf("[WALLET] Error while connecting to gateway: %s", err.Error())
+	}
+
+	client := pb.NewNodeServiceClient(conn)
+	pingResponse, err := client.Ping(context.Background(), &pb.PingRequest{})
+	if err != nil {
+		log.Fatalf("[WALLET] Error while pinging gateway: %s", err.Error())
+		return nil
+	}
+	log.Printf("[WALLET] Connected to gateway: %s", pingResponse.Message)
+
 	return &Server{
 		app: fiber.New(
 			fiber.Config{
-				AppName: cfg.ServerName,
+				AppName:               cfg.ServerName,
+				DisableStartupMessage: true,
 			}),
 		gateway: cfg.Gateway,
+		nc:      client,
 		port:    cfg.Port,
 		host:    cfg.Host,
 	}
 }
 
-func (s *Server) Run() {
+func (s *Server) Run() <-chan os.Signal {
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)
 	stripped, err := fs.Sub(frontend, "public")
 	if err != nil {
 		log.Fatalln(err)
@@ -75,6 +94,8 @@ func (s *Server) Run() {
 			log.Fatalf("Error while running server: %s", err.Error())
 		}
 	}()
+
+	return quit
 }
 
 func (s *Server) ShutdownGracefully() {
@@ -181,58 +202,46 @@ func (s *Server) CreateTransaction(ctx *fiber.Ctx) error {
 
 	signatureStr := signature.String()
 
-	bt := transaction.Request{
+	tx := pb.CreateTransactionRequest{
 		SenderPublicKey:  tr.SenderPublicKey,
 		RecipientAddress: tr.RecipientBlockChainAddress,
 		SenderAddress:    tr.SenderBlockChainAddress,
 		Amount:           amount32,
 		Signature:        signatureStr,
 	}
-	m, err := json.Marshal(bt)
-	if err != nil {
-		return err
-	}
-	buf := bytes.NewBuffer(m)
 
-	resp, err := http.Post(fmt.Sprintf("%s/api/transactions", s.gateway), "application/json", buf)
+	_, err = s.nc.CreateTransaction(context.Background(), &tx)
 	if err != nil {
-		return err
-	}
-	if resp.StatusCode == http.StatusCreated {
 		return ctx.JSON(fiber.Map{
-			"message": "tr created",
+			"message": err.Error(),
 			"success": true,
 		})
 	}
-	defer resp.Body.Close()
 
 	return ctx.JSON(fiber.Map{
-		"message": "tr failed",
-		"success": false,
+		"message": "Transaction created successfully",
+		"success": true,
 	})
+
 }
 
 func (s *Server) GetBalance(ctx *fiber.Ctx) error {
 	address := ctx.Params("address")
-	resp, err := http.Get(fmt.Sprintf("%s/api/balance/%s", s.gateway, address))
-	if err != nil {
-		return err
+	addressRequest := pb.GetBalanceRequest{
+		Address: address,
 	}
-	if resp.StatusCode == http.StatusCreated {
-		balance := blockchain.BalanceResponse{}
-		if err := json.NewDecoder(resp.Body).Decode(&balance); err != nil {
-			return err
-		}
+
+	balance, err := s.nc.GetBalance(context.Background(), &addressRequest)
+	if err != nil {
 		return ctx.JSON(fiber.Map{
-			"message": "balance retrieved",
-			"success": true,
-			"balance": balance.Balance,
+			"message": err.Error(),
+			"success": false,
 		})
 	}
-	defer resp.Body.Close()
 
 	return ctx.JSON(fiber.Map{
-		"message": "get balance failed",
-		"success": false,
+		"message": "Balance retrieved successfully",
+		"success": true,
+		"balance": balance.Balance,
 	})
 }

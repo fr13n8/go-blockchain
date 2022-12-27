@@ -7,12 +7,12 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/fr13n8/go-blockchain/pkg/services/transaction"
 	"log"
 	"strings"
 	"sync"
 
 	"github.com/fr13n8/go-blockchain/block"
-	"github.com/fr13n8/go-blockchain/transaction"
 	"github.com/fr13n8/go-blockchain/trxpool"
 	"github.com/fr13n8/go-blockchain/utils"
 )
@@ -22,21 +22,19 @@ const (
 )
 
 type BlockChain struct {
-	TransactionPool   *trxpool.TransactionPool
-	chain             []*block.Block
-	BlockChainAddress string
-	port              uint16
-	mux               sync.Mutex
+	TransactionPool *trxpool.TransactionPool
+	chain           []*block.Block
+	port            uint16
+	mux             sync.Mutex
 }
 
-func NewBlockChain(blockChainAddress string, port uint16) *BlockChain {
+func NewBlockChain(port uint16) *BlockChain {
 	b := block.NewGenesisBlock([]*transaction.Transaction{})
 	trxPoll := trxpool.NewTransactionPool()
 	bc := &BlockChain{
-		TransactionPool:   trxPoll,
-		chain:             []*block.Block{},
-		BlockChainAddress: blockChainAddress,
-		port:              port,
+		TransactionPool: trxPoll,
+		chain:           []*block.Block{},
+		port:            port,
 	}
 
 	bc.CreateBlock(b)

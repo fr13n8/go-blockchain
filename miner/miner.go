@@ -1,11 +1,11 @@
 package miner
 
 import (
+	"github.com/fr13n8/go-blockchain/pkg/services/blockchain"
 	"log"
 	"time"
 
 	"github.com/fr13n8/go-blockchain/block"
-	"github.com/fr13n8/go-blockchain/blockchain"
 )
 
 const (
@@ -19,15 +19,19 @@ type Miner struct {
 	bc           *blockchain.BlockChain
 }
 
-func NewMiner(minerAddress string, solver block.Solver, bc *blockchain.BlockChain) *Miner {
-	return &Miner{minerAddress: minerAddress, bc: bc, solver: solver}
+func NewMiner(solver block.Solver, bc *blockchain.BlockChain) *Miner {
+	return &Miner{bc: bc, solver: solver}
+}
+
+func (m *Miner) SetMinerAddress(address string) {
+	m.minerAddress = address
 }
 
 func (m *Miner) GetBlockForMine() *block.Block {
 	if m.bc.TransactionPool.Size() == 0 {
 		return nil
 	}
-	m.bc.AddTransaction(blockchain.MINING_SENDER, m.bc.BlockChainAddress, MINING_REWARD, nil, nil)
+	m.bc.AddTransaction(blockchain.MINING_SENDER, m.minerAddress, MINING_REWARD, nil, nil)
 	transactions := m.bc.GetTransactionPool()
 	previousHash := m.bc.LastBlock().Hash()
 

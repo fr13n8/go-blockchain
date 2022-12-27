@@ -1,0 +1,115 @@
+syntax = "proto3";
+
+package node;
+
+option go_package = "github.com/fr13n8/go-blockchain/pkg/network/node";
+
+service NodeService {
+  rpc Ping (PingRequest) returns (PingResponse) {}
+  rpc GetPeers (GetPeersRequest) returns (GetPeersResponse) {}
+  rpc GetBlocks (GetBlocksRequest) returns (GetBlocksResponse) {}
+  rpc GetBlock (GetBlockRequest) returns (BlockResponse) {}
+  rpc GetTransactions (GetTransactionsRequest) returns (GetTransactionsResponse) {}
+  rpc GetTransaction (GetTransactionRequest) returns (TransactionResponse) {}
+  rpc CreateTransaction (CreateTransactionRequest) returns (CreateTransactionResponse) {}
+  rpc StartMining (StartMiningRequest) returns (StartMiningResponse) {}
+  rpc StopMining (StopMiningRequest) returns (StopMiningResponse) {}
+  rpc GetBalance (GetBalanceRequest) returns (GetBalanceResponse) {}
+}
+
+message CreateTransactionRequest {
+  string recipientAddress = 1;
+  float  amount           = 2;
+  string senderAddress    = 3;
+  string senderPublicKey  = 4;
+  string signature        =5;
+}
+
+message CreateTransactionResponse {
+  string transactionId = 1;
+}
+
+message PingRequest {
+  string message = 1;
+}
+
+message PingResponse {
+  string message = 1;
+}
+
+message GetPeersRequest {
+  string message = 1;
+}
+
+message GetPeersResponse {
+  repeated string peers = 1;
+}
+
+message GetBlocksRequest {
+  string message = 1;
+}
+
+message GetBlocksResponse {
+  repeated string blocks = 1;
+}
+
+message GetBlockRequest {
+  string hash = 1;
+}
+
+message GetTransactionsRequest {
+  string message = 1;
+}
+
+message GetTransactionsResponse {
+  repeated string transactions = 1;
+}
+
+message GetTransactionRequest {
+  string hash = 1;
+}
+
+message StartMiningRequest {
+  string MinerAddress = 1;
+}
+
+message StartMiningResponse {
+  bool status = 1;
+}
+
+message StopMiningRequest {
+  string message = 1;
+}
+
+message StopMiningResponse {
+  bool status = 1;
+}
+
+message GetBalanceRequest {
+  string address = 1;
+}
+
+message GetBalanceResponse {
+  float balance = 1;
+}
+
+message BlockResponse {
+  Header header = 1;
+  repeated TransactionResponse transactions = 6;
+}
+
+message Header {
+  string hash          = 1;
+  string previous_hash = 2;
+  string merkle_root_hash = 3;
+  string target         = 4;
+  uint64 nonce          = 5;
+  int64  timestamp      = 6;
+}
+
+message TransactionResponse {
+  string id  = 1;
+  string sender_address  = 2;
+  string recipient_address    = 3;
+  float amount = 4;
+}

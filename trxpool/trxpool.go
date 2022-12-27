@@ -2,9 +2,8 @@ package trxpool
 
 import (
 	"fmt"
+	"github.com/fr13n8/go-blockchain/pkg/services/transaction"
 	"sync"
-
-	"github.com/fr13n8/go-blockchain/transaction"
 )
 
 type TransactionPool struct {
