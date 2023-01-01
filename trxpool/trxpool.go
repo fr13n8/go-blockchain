@@ -2,7 +2,7 @@ package trxpool
 
 import (
 	"fmt"
-	"github.com/fr13n8/go-blockchain/pkg/services/transaction"
+	"github.com/fr13n8/go-blockchain/transaction"
 	"sync"
 )
 

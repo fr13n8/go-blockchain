@@ -2,11 +2,11 @@ version: v1
 managed:
   enabled: true
   go_package_prefix:
-    default: github.com/fr13n8/go-blockchain/pkg/network
+    default: github.com/fr13n8/go-blockchain/proto
 plugins:
   - remote: buf.build/protocolbuffers/plugins/go:v1.28.0-1
-    out: pkg/network/node
+    out: gen
     opt: paths=source_relative
   - remote: buf.build/grpc/plugins/go:v1.2.0-1
-    out: pkg/network/node
+    out: gen
     opt: paths=source_relative

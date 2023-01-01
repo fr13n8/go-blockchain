@@ -2,9 +2,8 @@ package main
 
 import (
 	"flag"
+	"github.com/fr13n8/go-blockchain/wallet"
 	"log"
-
-	clientServer "github.com/fr13n8/go-blockchain/pkg/client/server"
 )
 
 func main() {
@@ -12,13 +11,13 @@ func main() {
 	gateway := flag.String("gateway", ":5050", "gateway address")
 	flag.Parse()
 
-	cfg := clientServer.Config{
+	cfg := wallet.Config{
 		Port:       8080,
 		ServerName: "Wallet",
 		Host:       "0.0.0.0",
 		Gateway:    "0.0.0.0" + *gateway,
 	}
-	s := clientServer.NewServer(&cfg)
+	s := wallet.NewServer(&cfg)
 	log.Printf("[WALLET] Start wallet listen on port %d\n", 8080)
 	quit := s.Run()
 	<-quit

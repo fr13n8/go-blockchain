@@ -1,0 +1,12 @@
+version: v1
+name: buf.build/fr13n8/go-blockchain
+lint:
+  use:
+    - DEFAULT
+  ignore_only:
+    PACKAGE_DIRECTORY_MATCH:
+      - node.proto
+    PACKAGE_VERSION_SUFFIX:
+      - node.proto
+    SERVICE_SUFFIX:
+      - node.proto

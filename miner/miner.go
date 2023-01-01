@@ -1,7 +1,7 @@
 package miner
 
 import (
-	"github.com/fr13n8/go-blockchain/pkg/services/blockchain"
+	"github.com/fr13n8/go-blockchain/blockchain"
 	"log"
 	"time"
 
