@@ -26,9 +26,8 @@ type Config struct {
 	ProtocolID string
 	Rendezvous string
 
-	Bc    *blockchain.BlockChain
-	Miner *miner.Miner
-	//Wallet      *wallet.Wallet
+	Bc          *blockchain.BlockChain
+	Miner       *miner.Miner
 	PeerManager *peer_manager.PeerManager
 }
 
@@ -58,7 +57,8 @@ func (s *Server) Port() int {
 func NewServer(cfg *Config) *Server {
 	sourceMultiAddr, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%d", cfg.Addr.IP.String(), cfg.Addr.Port))
 	if err != nil {
-		panic(err)
+		log.Println("[NETWORK] Error while creating multiaddr: ", err)
+		return nil
 	}
 
 	cfg.DNS = sourceMultiAddr
@@ -68,16 +68,18 @@ func NewServer(cfg *Config) *Server {
 	}
 }
 
-func (s *Server) Run(bootstrapPeers []multiaddr.Multiaddr, peerAddress chan<- string) {
+func (s *Server) Run(bootstrapPeers []multiaddr.Multiaddr, peerAddress chan<- []string) {
 	r := rand.Reader
 	prvKey, _, err := crypto.GenerateKeyPairWithReader(crypto.RSA, 2048, r)
 	if err != nil {
-		panic(err)
+		log.Println("[NETWORK] Error while generating key pair: ", err)
+		return
 	}
 
 	h, err := libp2p.New(libp2p.ListenAddrs(s.Config.DNS), libp2p.Identity(prvKey))
 	if err != nil {
-		panic(err)
+		log.Println("[NETWORK] Error while creating host: ", err)
+		return
 	}
 	s.Host = h
 	s.GrpcStream = gr.NewStream()
@@ -97,13 +99,14 @@ func (s *Server) Run(bootstrapPeers []multiaddr.Multiaddr, peerAddress chan<- st
 	}
 
 	discoveryService := discovery.NewDiscoveryService(s.Config.PeerManager)
-
-	kademliaDHT, err := discoveryService.NewDHT(ctx, s.Host, bootstrapPeers, s.GrpcStream, s.Config.ProtocolID, peerAddress)
+	kademliaDHT, err := discoveryService.NewDHT(ctx, s.Host, bootstrapPeers)
 	if err != nil {
-		panic(err)
+		log.Println("[NETWORK] Error while creating DHT: ", err)
+		return
 	}
 	if err = kademliaDHT.Bootstrap(ctx); err != nil {
-		panic(err)
+		log.Println("[NETWORK] Error while bootstrapping DHT: ", err)
+		return
 	}
 
 	go discoveryService.Discover(ctx, s.Host, kademliaDHT, s.Config.Rendezvous, s.GrpcStream, s.Config.ProtocolID, peerAddress)
@@ -112,7 +115,7 @@ func (s *Server) Run(bootstrapPeers []multiaddr.Multiaddr, peerAddress chan<- st
 func (s *Server) ShutdownGracefully() {
 	err := s.Host.Close()
 	if err != nil {
-		log.Fatal("[NETWORK] Error while closing host: ", err)
+		log.Println("[NETWORK] Error while closing host: ", err)
 		return
 	}
 	s.CancelFunc()

@@ -108,14 +108,6 @@ func (g *Stream) Close() error {
 	return nil
 }
 
-func (g *Stream) Stop() {
-	g.grpcServer.Stop()
-}
-
-func (g *Stream) GracefulStop() {
-	g.grpcServer.GracefulStop()
-}
-
 func WrapClient(s network.Stream) *grpc.ClientConn {
 	opts := grpc.WithContextDialer(func(ctx context.Context, peerIdStr string) (net.Conn, error) {
 		return &streamConn{s}, nil

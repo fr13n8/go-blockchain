@@ -34,37 +34,42 @@ func NewConfig() *Config {
 type Server struct {
 	gRpcServer *grpc.Server
 	config     *Config
-	listener   *net.Listener
 }
 
 func NewServer(cfg *Config) *Server {
-	addr := fmt.Sprintf("%s:%d", cfg.Addr.IP.String(), cfg.Addr.Port)
-	listener, err := net.Listen("tcp", addr)
-	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
-	}
-
 	return &Server{
-		config:   cfg,
-		listener: &listener,
+		config: cfg,
 	}
 }
 
 func (s *Server) Addr() net.Addr {
-	return (*s.listener).Addr()
+	return s.config.Addr
 }
 
-func (s *Server) Run() {
+func (s *Server) Run() string {
 	s.gRpcServer = grpc.NewServer()
 	handlers := NewNodeHandler(s)
 	pb.RegisterNodeServiceServer(s.gRpcServer, handlers)
 
-	log.Println("[NODE] Server started on", (*s.listener).Addr().String())
+	addr := fmt.Sprintf("%s:%d", s.config.Addr.IP.String(), s.config.Addr.Port)
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		log.Printf("[NODE] Failed to listen: %v", err)
+		return ""
+	}
+
+	s.config.Addr = &net.TCPAddr{
+		IP:   net.ParseIP("0.0.0.0"),
+		Port: listener.Addr().(*net.TCPAddr).Port,
+	}
+	log.Println("[NODE] Server started on", listener.Addr().String())
 	go func() {
-		if err := s.gRpcServer.Serve(*s.listener); err != nil {
+		if err := s.gRpcServer.Serve(listener); err != nil {
 			fmt.Printf("failed to serve: %v\n", err)
 		}
 	}()
+
+	return listener.Addr().String()
 }
 
 func (s *Server) ShutdownGracefully() {

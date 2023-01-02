@@ -12,6 +12,8 @@ import (
 	"github.com/fr13n8/go-blockchain/network/discovery"
 	"github.com/fr13n8/go-blockchain/server"
 	"github.com/multiformats/go-multiaddr"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"log"
 	"net/url"
 	"strconv"
@@ -26,7 +28,7 @@ var (
 	logsWidget     = widget.NewMultiLineEntry()
 	nodeClient     pb.NodeServiceClient
 	peers          = make([]string, 0)
-	discoveryPeers = make(chan string)
+	discoveryPeers = make(chan []string)
 )
 
 func (l *Logs) Write(data []byte) (n int, err error) {
@@ -39,7 +41,13 @@ var logs = Logs{
 }
 
 func listenNode(bootNodes []multiaddr.Multiaddr, exit <-chan struct{}) {
-	srv.NodeServer.Run()
+	nodeAddr := srv.NodeServer.Run()
+	conn, err := grpc.Dial(nodeAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatalf("[APP] Error while connecting to node gateway: %s", err.Error())
+		return
+	}
+	nodeClient = pb.NewNodeServiceClient(conn)
 	srv.PeerDiscovery.Run(bootNodes, discoveryPeers)
 	<-exit
 	srv.NodeServer.ShutdownGracefully()
@@ -188,14 +196,15 @@ func main() {
 
 	logsWidget.Disable()
 	logsWidget.TextStyle.Monospace = true
-	go func(peers *[]string) {
+	go func(peers *[]string, list *widget.List) {
 		for {
 			select {
-			case peer := <-discoveryPeers:
-				log.Printf("[NODE] New peer: %v\n", peer)
+			case newPeers := <-discoveryPeers:
+				*peers = newPeers
+				list.Refresh()
 			}
 		}
-	}(&peers)
+	}(&peers, peersList)
 
 	logsCard := widget.NewCard("Logs", "", logsWidget)
 	listCard := widget.NewCard("Nodes", "", peersList)
