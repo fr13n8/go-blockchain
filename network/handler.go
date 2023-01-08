@@ -1,11 +1,10 @@
 package network
 
 import (
-	"encoding/json"
-	pb "github.com/fr13n8/go-blockchain/gen/peer"
-	"github.com/fr13n8/go-blockchain/network/peer-manager"
-	"github.com/pkg/errors"
 	"io"
+
+	pb "github.com/fr13n8/go-blockchain/gen/peer"
+	peer_manager "github.com/fr13n8/go-blockchain/network/peer-manager"
 )
 
 type PeerHandler struct {
@@ -20,9 +19,6 @@ func NewPeerHandler(service *peer_manager.PeerManager) *PeerHandler {
 }
 
 func (h *PeerHandler) Message(serverStream pb.PeerService_MessageServer) error {
-	if err := h.pm.AddPeer(serverStream); err != nil {
-		return errors.Wrap(err, "failed to add server")
-	}
 	for {
 		msg, err := serverStream.Recv()
 		if err != nil {
@@ -31,7 +27,7 @@ func (h *PeerHandler) Message(serverStream pb.PeerService_MessageServer) error {
 		if err == io.EOF {
 			return nil
 		}
-		ctx := serverStream.Context()
+		// ctx := serverStream.Context()
 		switch msg.Type {
 		case messageAddTx:
 			//var tx transaction.Request
@@ -54,14 +50,6 @@ func (h *PeerHandler) Message(serverStream pb.PeerService_MessageServer) error {
 			//bc := h.ns.Bc
 			//bc.CreateBlock(&b)
 			//h.ns.PeerManager.BroadcastMessage(ctx, msg)
-		case getPeers:
-			peers := h.pm.GetPeers()
-			peersBytes, err := json.Marshal(peers)
-			if err != nil {
-				return errors.Wrap(err, "marshal peers")
-			}
-
-			h.pm.BroadcastMessage(ctx, NewGetPeersMessage(peersBytes))
 		}
 	}
 }

@@ -5,7 +5,6 @@ package peer;
 option go_package = "github.com/fr13n8/go-blockchain/network/proto/gen";
 
 service PeerService {
-  rpc FindPeers (FindPeersRequest) returns (FindPeersResponse) {}
   rpc Message (stream MessageRequest) returns (stream MessageResponse) {}
 }
 
@@ -17,13 +16,4 @@ message MessageRequest {
 message MessageResponse {
   string type = 1;
   bytes data = 2;
-}
-
-message FindPeersRequest {
-  string key = 1;
-  int64 count = 2;
-}
-
-message FindPeersResponse {
-  repeated string nodes = 1;
 }

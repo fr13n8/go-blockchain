@@ -68,18 +68,18 @@ func NewServer(cfg *Config) *Server {
 	}
 }
 
-func (s *Server) Run(bootstrapPeers []multiaddr.Multiaddr, peerAddress chan<- []string) {
+func (s *Server) Run(bootstrapPeers []multiaddr.Multiaddr, peerAddress chan<- []string) string {
 	r := rand.Reader
 	prvKey, _, err := crypto.GenerateKeyPairWithReader(crypto.RSA, 2048, r)
 	if err != nil {
 		log.Println("[NETWORK] Error while generating key pair: ", err)
-		return
+		return ""
 	}
 
 	h, err := libp2p.New(libp2p.ListenAddrs(s.Config.DNS), libp2p.Identity(prvKey))
 	if err != nil {
 		log.Println("[NETWORK] Error while creating host: ", err)
-		return
+		return ""
 	}
 	s.Host = h
 	s.GrpcStream = gr.NewStream()
@@ -102,14 +102,16 @@ func (s *Server) Run(bootstrapPeers []multiaddr.Multiaddr, peerAddress chan<- []
 	kademliaDHT, err := discoveryService.NewDHT(ctx, s.Host, bootstrapPeers)
 	if err != nil {
 		log.Println("[NETWORK] Error while creating DHT: ", err)
-		return
+		return ""
 	}
 	if err = kademliaDHT.Bootstrap(ctx); err != nil {
 		log.Println("[NETWORK] Error while bootstrapping DHT: ", err)
-		return
+		return ""
 	}
 
 	go discoveryService.Discover(ctx, s.Host, kademliaDHT, s.Config.Rendezvous, s.GrpcStream, s.Config.ProtocolID, peerAddress)
+
+	return fmt.Sprintf("%s/p2p/%s", s.Host.Addrs()[1], s.Host.ID().String())
 }
 
 func (s *Server) ShutdownGracefully() {

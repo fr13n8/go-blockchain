@@ -3,7 +3,6 @@ package discovery
 import (
 	"context"
 	"log"
-	"strings"
 	"sync"
 	"time"
 
@@ -28,25 +27,6 @@ func NewDiscoveryService(pm *peer_manager.PeerManager) *Service {
 	return &Service{
 		pm: pm,
 	}
-}
-
-type addrList []multiaddr.Multiaddr
-
-func (al *addrList) String() string {
-	strs := make([]string, len(*al))
-	for i, addr := range *al {
-		strs[i] = addr.String()
-	}
-	return strings.Join(strs, ",")
-}
-
-func (al *addrList) Set(value string) error {
-	addr, err := multiaddr.NewMultiaddr(value)
-	if err != nil {
-		return err
-	}
-	*al = append(*al, addr)
-	return nil
 }
 
 func StringsToAddrs(addrStrings []string) (maddrs []multiaddr.Multiaddr, err error) {
@@ -113,6 +93,7 @@ func (ds *Service) Discover(ctx context.Context, h host.Host, dht *dht.IpfsDHT, 
 			peers, err := routingDiscovery.FindPeers(ctx, rendezvous)
 			if err != nil {
 				log.Printf("Error finding peers: %v\n", err)
+				continue
 			}
 
 			for p := range peers {
@@ -126,6 +107,7 @@ func (ds *Service) Discover(ctx context.Context, h host.Host, dht *dht.IpfsDHT, 
 					myPeers = append(myPeers, addrs[0].String()+" <=> "+addrs[1].String())
 				}
 				peerAddress <- myPeers
+
 				if h.Network().Connectedness(p.ID) != network.Connected {
 					_, err := h.NewStream(ctx, p.ID, protocol.ID(protocolId))
 					if err != nil {

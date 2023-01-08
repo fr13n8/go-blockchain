@@ -27,6 +27,7 @@ var (
 	srv            = server.NewServer()
 	logsWidget     = widget.NewMultiLineEntry()
 	nodeClient     pb.NodeServiceClient
+	peerAddr       = ""
 	peers          = make([]string, 0)
 	discoveryPeers = make(chan []string)
 )
@@ -48,7 +49,7 @@ func listenNode(bootNodes []multiaddr.Multiaddr, exit <-chan struct{}) {
 		return
 	}
 	nodeClient = pb.NewNodeServiceClient(conn)
-	srv.PeerDiscovery.Run(bootNodes, discoveryPeers)
+	peerAddr = srv.PeerDiscovery.Run(bootNodes, discoveryPeers)
 	<-exit
 	srv.NodeServer.ShutdownGracefully()
 	srv.PeerDiscovery.ShutdownGracefully()
@@ -93,7 +94,11 @@ func main() {
 		}
 		listening = !listening
 	})
-	nodeListen := container.NewGridWithColumns(2, bootNodes, toggleNodeListenButton)
+	var copyBootNodeAddressButton *widget.Button
+	copyBootNodeAddressButton = widget.NewButton("Copy boot node address", func() {
+		w.Clipboard().SetContent(peerAddr)
+	})
+	nodeListen := container.NewGridWithColumns(3, bootNodes, toggleNodeListenButton, copyBootNodeAddressButton)
 
 	minerAddress := widget.NewEntry()
 	minerAddress.SetPlaceHolder("Set miner address")
@@ -232,7 +237,7 @@ func main() {
 
 	panel := container.NewBorder(vBox, nil, nil, nil, split)
 	w.SetContent(panel)
-	w.Resize(fyne.NewSize(940, 780))
+	w.Resize(fyne.NewSize(930, 580))
 	w.SetFixedSize(false)
 	w.ShowAndRun()
 }
