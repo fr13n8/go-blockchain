@@ -4,10 +4,6 @@ import (
 	"context"
 	"embed"
 	"fmt"
-	pb "github.com/fr13n8/go-blockchain/gen/node"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -16,15 +12,26 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gofiber/fiber/v2/middleware/filesystem"
+	"github.com/a-h/templ"
+	pb "github.com/fr13n8/go-blockchain/gen/node"
+	"github.com/fr13n8/go-blockchain/wallet/components"
+	"github.com/fr13n8/go-blockchain/wallet/domain"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/fr13n8/go-blockchain/utils"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v2/middleware/filesystem"
+	"github.com/gofiber/fiber/v2/middleware/logger"
 )
 
-//go:embed public
-var frontend embed.FS
+// //go:embed public
+// var frontend embed.FS
+
+//go:embed assets
+var assets embed.FS
 
 type Config struct {
 	Port       uint16
@@ -71,23 +78,34 @@ func NewServer(cfg *Config) *Server {
 func (s *Server) Run() <-chan os.Signal {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)
-	stripped, err := fs.Sub(frontend, "public")
-	if err != nil {
-		log.Fatalln(err)
-	}
+	// stripped, err := fs.Sub(frontend, "public")
+	// if err != nil {
+	// 	log.Fatalln(err)
+	// }
 
 	s.app.Use(cors.New())
+
+	s.app.Use(logger.New(logger.Config{
+		Format: "[${ip}]:${port} ${status} - ${method} ${path}\n",
+	}))
 
 	api := s.app.Group("/api")
 	api.Post("/wallet/create", s.WalletCreate)
 	api.Post("/transaction/create", s.CreateTransaction)
 	api.Get("/wallet/balance/:address", s.GetBalance)
 
-	s.app.Use("/", filesystem.New(filesystem.Config{
-		Root:   http.FS(stripped),
-		Index:  "index.html",
-		Browse: true,
+	// s.app.Use("/", filesystem.New(filesystem.Config{
+	// 	Root:   http.FS(stripped),
+	// 	Index:  "index.html",
+	// 	Browse: true,
+	// }))
+	s.app.Use("/assets", filesystem.New(filesystem.Config{
+		Root:       http.FS(assets),
+		PathPrefix: "assets",
+		Browse:     true,
 	}))
+	s.app.Get("/", s.MainView)
+	s.app.Get("/wallet/balance/:address", s.GetBalanceView)
 	go func() {
 		if err := s.app.Listen(fmt.Sprintf("%s:%s", s.host, fmt.Sprintf("%d", s.port))); err != nil {
 			log.Fatalf("Error while running server: %s", err.Error())
@@ -243,4 +261,62 @@ func (s *Server) GetBalance(ctx *fiber.Ctx) error {
 		"success": true,
 		"balance": balance.Balance,
 	})
+}
+
+func (s *Server) MainView(ctx *fiber.Ctx) error {
+	w := NewWallet()
+	address := w.BlockChainAddress()
+	addressRequest := pb.GetBalanceRequest{
+		Address: address,
+	}
+
+	balance, err := s.nc.GetBalance(context.Background(), &addressRequest)
+	if err != nil {
+		return ctx.JSON(fiber.Map{
+			"message": err.Error(),
+			"success": false,
+		})
+	}
+
+	details := []*domain.WalletDetail{
+		{
+			Field: "Blockchain Address",
+			Value: address,
+			Id:    "blockchain_address",
+		},
+		{
+			Field: "Private key",
+			Value: w.PrivateKeyStr(),
+			Id:    "private_key",
+		},
+		{
+			Field: "Public key",
+			Value: w.PublicKeyStr(),
+			Id:    "publick_key",
+		},
+		{
+			Field: "Balance",
+			Value: fmt.Sprintf("%.2f", balance.Balance),
+			Id:    "balance",
+		},
+	}
+
+	return adaptor.HTTPHandler(templ.Handler(components.Page(details)))(ctx)
+}
+
+func (s *Server) GetBalanceView(ctx *fiber.Ctx) error {
+	address := ctx.Params("address")
+	addressRequest := pb.GetBalanceRequest{
+		Address: address,
+	}
+
+	balance, err := s.nc.GetBalance(context.Background(), &addressRequest)
+	if err != nil {
+		return ctx.JSON(fiber.Map{
+			"message": err.Error(),
+			"success": false,
+		})
+	}
+
+	return adaptor.HTTPHandler(templ.Handler(components.WalletDetailsItem("Balance", fmt.Sprintf("%.2f", balance.Balance), "balance")))(ctx)
 }

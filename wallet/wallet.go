@@ -7,8 +7,8 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+
 	"github.com/btcsuite/btcutil/base58"
-	"golang.org/x/crypto/ripemd160"
 )
 
 type Wallet struct {
@@ -30,7 +30,7 @@ func NewWallet() *Wallet {
 	h2.Write(publicKey.Y.Bytes())
 	digest2 := h2.Sum(nil)
 	// 3. Perform RIPEMD-160 hashing on the result of SHA-256 (20 bytes)
-	h3 := ripemd160.New()
+	h3 := sha256.New()
 	h3.Write(digest2)
 	digest3 := h3.Sum(nil)
 	// 4. Add version byte in front of RIPEMD-160 hash (0x00 for Main Network) (21 bytes)

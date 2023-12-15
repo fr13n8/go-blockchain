@@ -1,0 +1,99 @@
+package components
+
+import "github.com/fr13n8/go-blockchain/wallet/domain"
+
+templ Page(details []*domain.WalletDetail) {
+	<!DOCTYPE html>
+	<html>
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<title>Wallet</title>
+			<link rel="icon" type="image/x-icon" href="/assets/favicon.ico"/>
+			<script src="/assets/js/htmx.min.js"></script>
+			<link rel="stylesheet" href="/assets/css/reset.css"/>
+			<link rel="stylesheet" href="/assets/css/bulma.min.css"/>
+		</head>
+		<body style="min-height: 100vh" class="has-text-white has-background-black-ter">
+			@Layout() {
+				@WrapCards("wallet-details") {
+					@WalletDetails(details)
+				}
+				@WrapCards("transactions") {
+					@Transactions()
+				}
+			}
+		</body>
+	</html>
+}
+
+templ Layout() {
+	<header class="hero is-primary">
+		<div class="hero-body">
+			<div class="container has-text-centered">
+				<h1 class="has-text-weight-bold is-size-1">Wallet</h1>
+			</div>
+		</div>
+	</header>
+	<section class="section">
+		<div class="container">
+			<div class="columns is-centered">
+				{ children... }
+			</div>
+		</div>
+	</section>
+}
+
+templ WrapCards(id string) {
+	<div class="column is-half is-bordered" id={ id }>
+		{ children... }
+	</div>
+}
+
+templ WalletDetails(details []*domain.WalletDetail) {
+	<div class="box has-background-grey-dark">
+		<h2 class="has-text-weight-bold is-size-3 mb-2 has-text-centered has-text-grey-lighter">Details</h2>
+		for _, detail := range details {
+			@WalletDetailsItem(detail.Field, detail.Value, detail.Id)
+		}
+		<div class="block mt-3">
+			<div class="control is-flex is-justify-content-flex-end">
+				<button hx-target={ "#" + details[3].Id } hx-swap="outerHTML" hx-get={ "/wallet/balance/" + details[0].Value } class="button is-primary">Refresh</button>
+			</div>
+		</div>
+	</div>
+}
+
+templ WalletDetailsItem(field, value, id string) {
+	<div class="block mb-2" id={ id }>
+		<label class="has-text-grey-lighter label mb-1">{ field }:</label>
+		<div class="control">
+			<input class="input has-background-black-bis has-text-grey-light" type="text" value={ value } readonly/>
+		</div>
+	</div>
+}
+
+templ Transactions() {
+	<div class="box has-background-grey-dark">
+		<h2 class="has-text-weight-bold is-size-3 mb-2 has-text-centered has-text-grey-lighter">Transactions</h2>
+		<form>
+			<div class="block mb-2">
+				<label class="has-text-grey-lighter label mb-1">Blockchain Address:</label>
+				<div class="control">
+					<input class="input has-background-black-bis has-text-grey-light" type="text"/>
+				</div>
+			</div>
+			<div class="block mb-2">
+				<label class="has-text-grey-lighter label mb-1">Balance:</label>
+				<div class="control">
+					<input class="input has-background-black-bis has-text-grey-light" type="text"/>
+				</div>
+			</div>
+			<div class="block mt-3">
+				<div class="control is-flex is-justify-content-flex-end">
+					<button class="button is-primary">Send</button>
+				</div>
+			</div>
+		</form>
+	</div>
+}

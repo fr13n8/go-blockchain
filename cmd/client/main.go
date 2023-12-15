@@ -2,8 +2,9 @@ package main
 
 import (
 	"flag"
-	"github.com/fr13n8/go-blockchain/wallet"
 	"log"
+
+	"github.com/fr13n8/go-blockchain/wallet"
 )
 
 func main() {
