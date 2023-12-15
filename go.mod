@@ -4,10 +4,10 @@ go 1.21
 
 require (
 	fyne.io/fyne/v2 v2.3.0
+	github.com/a-h/templ v0.2.476
 	github.com/btcsuite/btcutil v1.0.2
-	github.com/gofiber/fiber/v2 v2.40.1
+	github.com/gofiber/fiber/v2 v2.51.0
 	github.com/pkg/errors v0.9.1
-	golang.org/x/crypto v0.16.0
 	google.golang.org/grpc v1.53.0
 	google.golang.org/protobuf v1.31.0
 )
@@ -15,7 +15,7 @@ require (
 require (
 	github.com/go-logr/logr v1.3.0 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
-	github.com/google/uuid v1.3.0 // indirect
+	github.com/google/uuid v1.4.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
@@ -38,12 +38,13 @@ require (
 	go.opentelemetry.io/otel v1.14.0 // indirect
 	go.opentelemetry.io/otel/trace v1.14.0 // indirect
 	go.uber.org/mock v0.3.0 // indirect
+	golang.org/x/crypto v0.16.0 // indirect
 	gonum.org/v1/gonum v0.11.0 // indirect
 )
 
 require (
 	fyne.io/systray v1.10.1-0.20221115204952-d16a6177e6f1 // indirect
-	github.com/andybalholm/brotli v1.0.4 // indirect
+	github.com/andybalholm/brotli v1.0.5 // indirect
 	github.com/benbjohnson/clock v1.3.5 // indirect
 	github.com/benoitkugler/textlayout v0.3.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -97,7 +98,7 @@ require (
 	github.com/marten-seemann/tcp v0.0.0-20210406111302-dfbc87cc63fd // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/mattn/go-runewidth v0.0.14 // indirect
+	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/miekg/dns v1.1.57 // indirect
 	github.com/mikioh/tcpinfo v0.0.0-20190314235526-30a79bb1804b // indirect
 	github.com/mikioh/tcpopt v0.0.0-20190314235656-172688c1accc // indirect
@@ -129,7 +130,7 @@ require (
 	github.com/stretchr/testify v1.8.4 // indirect
 	github.com/tevino/abool v1.2.0 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
-	github.com/valyala/fasthttp v1.43.0 // indirect
+	github.com/valyala/fasthttp v1.50.0 // indirect
 	github.com/valyala/tcplisten v1.0.0 // indirect
 	github.com/yuin/goldmark v1.5.3 // indirect
 	go.uber.org/dig v1.17.1 // indirect
